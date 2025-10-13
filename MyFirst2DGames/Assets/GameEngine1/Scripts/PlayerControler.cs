@@ -2,76 +2,110 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("캐릭터 설정")]
-    public string playerName = "김성준"; 
-    public float moveSpeed = 6.5f;         
+    [Header("이동 설정")]
+    public float moveSpeed = 5.0f;
+
+    [Header("점프 설정")]
+    public float jumpForce = 10.0f;
+
+    [Header("플레이어 설정")]
+    public int maxHealth = 1; // 간단한 목숨 설정 (1이면 한 번만 맞으면 죽음)
+
     private Animator animator;
-    private SpriteRenderer spriteRenderer;
-    private bool isMoving = false;
-    private bool isJumpingNow = false;
+    private Rigidbody2D rb;
+    private bool isGrounded = false;
+    private int score = 0;
+    private int currentHealth;
 
     void Start()
     {
-        // 컴포넌트 가져오기
         animator = GetComponent<Animator>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
+        rb = GetComponent<Rigidbody2D>();
 
-        // 캐릭터 소개
-        Debug.Log("안녕하세요, " + playerName + "님!");
-        Debug.Log("이동 속도: " + moveSpeed);
+        if (rb == null)
+            Debug.LogError("Rigidbody2D가 없습니다!");
+
+        currentHealth = maxHealth;
     }
 
     void Update()
     {
-        Vector3 movement = Vector3.zero;
-        isMoving = false;
+        // 좌우 이동
+        float moveX = 0f;
+        if (Input.GetKey(KeyCode.A)) moveX = -1f;
+        if (Input.GetKey(KeyCode.D)) moveX = 1f;
 
-        // --- 좌우 이동 ---
-        if (Input.GetKey(KeyCode.A))
+        rb.velocity = new Vector2(moveX * moveSpeed, rb.velocity.y);
+
+        // 점프
+        if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
         {
-            movement += Vector3.left;
-            transform.localScale = new Vector3(-1, 1, 1);
-            isMoving = true;
-        }
-        if (Input.GetKey(KeyCode.D))
-        {
-            movement += Vector3.right;
-            transform.localScale = new Vector3(1, 1, 1);
-            isMoving = true;
+            rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+            Debug.Log("점프!");
         }
 
-        // --- 달리기 (Shift) ---
-        float currentMoveSpeed = moveSpeed;
-        if (Input.GetKey(KeyCode.LeftShift) && isMoving)
-        {
-            currentMoveSpeed = moveSpeed * 2f;
-            Debug.Log("달리기 모드!");
-        }
-
-        // --- 이동 적용 ---
-        if (movement != Vector3.zero)
-        {
-            transform.Translate(movement * currentMoveSpeed * Time.deltaTime);
-        }
-
-        // --- 점프 ---
-        if (Input.GetKeyDown(KeyCode.Space) && !isJumpingNow)
-        {
-            isJumpingNow = true;
-            animator.SetBool("isJumping", true);
-            Debug.Log(playerName + "님이 점프했습니다!");
-        }
-
-        // --- 점프 종료 감지 ---
-        AnimatorStateInfo stateInfo = animator.GetCurrentAnimatorStateInfo(0);
-        if (stateInfo.IsName("Jump") && stateInfo.normalizedTime >= 1.0f)
-        {
-            animator.SetBool("isJumping", false);
-            isJumpingNow = false;
-        }
-
-        // --- 애니메이터 Speed 파라미터 갱신 ---
-        float currentSpeed = isMoving ? currentMoveSpeed : 0f;
+        // 애니메이션 (속도 기반)
+        float currentSpeed = Mathf.Abs(rb.velocity.x);
         animator.SetFloat("Speed", currentSpeed);
+    }
+
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        // 바닥 감지
+        if (collision.gameObject.CompareTag("Ground"))
+        {
+            isGrounded = true;
+            Debug.Log("바닥에 착지!");
+        }
+
+        // ✅ 장애물 감지
+        if (collision.gameObject.CompareTag("Obstacle"))
+        {
+            Debug.Log("⚠️ 장애물에 충돌!");
+            TakeDamage(1);
+        }
+    }
+
+    void OnCollisionExit2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Ground"))
+        {
+            isGrounded = false;
+            Debug.Log("바닥에서 떨어짐");
+        }
+    }
+
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        // 코인 획득
+        if (other.CompareTag("Coin"))
+        {
+            score++;
+            Debug.Log("코인 획득! 현재 점수: " + score);
+            Destroy(other.gameObject);
+        }
+    }
+
+    // ✅ 데미지 처리 함수
+    void TakeDamage(int damage)
+    {
+        currentHealth -= damage;
+        animator.SetTrigger("Hit"); // 피격 애니메이션 (Animator에 "Hit" Trigger 필요)
+
+        if (currentHealth <= 0)
+        {
+            Die();
+        }
+    }
+
+    // ✅ 사망 처리
+    void Die()
+    {
+        Debug.Log("💀 플레이어 사망!");
+        animator.SetTrigger("Die"); // Animator에 "Die" Trigger 추가 가능
+        rb.velocity = Vector2.zero;
+        rb.isKinematic = true; // 물리 정지
+        GetComponent<Collider2D>().enabled = false; // 충돌 비활성화
+        this.enabled = false; // PlayerController 비활성화 (입력 막기)
     }
 }
