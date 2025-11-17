@@ -66,6 +66,36 @@ public class PlayerController : MonoBehaviour
             Debug.Log("⚠️ 장애물에 충돌!");
             TakeDamage(1);
         }
+
+        if (collision.gameObject.CompareTag("Enemy"))
+        {
+            // 충돌 지점의 법선 벡터 확인
+            Vector2 normal = collision.contacts[0].normal;
+            
+            // 위에서 아래로 충돌했는지 확인 (y축 법선이 위를 향함)
+            if (normal.y > 0.7f)
+            {
+                // 적 처치
+                Health enemyHealth = collision.gameObject.GetComponent<Health>();
+                if (enemyHealth != null)
+                {
+                    enemyHealth.TakeDamage(1);
+                }
+                
+                // 플레이어 약간 튕겨오름 (선택 사항)
+                Rigidbody2D rb = GetComponent<Rigidbody2D>();
+                rb.velocity = new Vector2(rb.velocity.x, 5f);
+            }
+            else
+            {
+                // 옆이나 아래에서 충돌 시 플레이어가 데미지
+                Health playerHealth = GetComponent<Health>();
+                if (playerHealth != null)
+                {
+                    playerHealth.TakeDamage(1);
+                }
+            }
+        }
     }
 
     void OnCollisionExit2D(Collision2D collision)
@@ -110,4 +140,8 @@ public class PlayerController : MonoBehaviour
         GetComponent<Collider2D>().enabled = false; // 충돌 비활성화
         this.enabled = false; // PlayerController 비활성화 (입력 막기)
     }
+
+    
+
+    
 }
